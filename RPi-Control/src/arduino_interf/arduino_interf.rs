@@ -1,14 +1,31 @@
     //mod arduino_interf_impl;
+    extern crate serialport;
 
-    extern crate serial;
-    use std::io;
+    #[cfg(unix)]
     use std::str;
+    use std::io::Read;
+    use std::env;
+    use serialport::posix::TTYPort;
+    use std::time::Duration;
 
-    use serial::SystemPort;
 
-    use std::io::prelude::*;
-    use serial::prelude::*;
+    #[cfg(unix)]
+    const DEFAULT_TTY: &str = "/dev/ttyUSB0";
+    #[cfg(windows)]
+    const DEFAULT_TTY: &str = "COM1";
 
+
+
+
+
+
+    fn cast_u32_to_bool(to_cast: &u32) -> bool {
+        if *to_cast > 0 {
+            true
+        } else {
+            false
+        }
+    }
 
     pub struct OptionStruct {
         pub h2o_sensor_pin: u8,
@@ -29,13 +46,7 @@
         pub setup_name: &'static str
     }
 
-    pub(super) const SERIAL_SETTINGS: serial::PortSettings = serial::PortSettings {
-        baud_rate: serial::Baud9600,
-        char_size: serial::Bits8,
-        parity: serial::ParityNone,
-        stop_bits: serial::Stop1,
-        flow_control: serial::FlowNone
-    };
+
 
     pub enum Commands {
         SET,
@@ -68,6 +79,7 @@
         }
     }
 
+    #[derive(Clone)]
     pub enum Devices {
         WATERPUMP,
         FOODPUMP,
@@ -107,13 +119,22 @@
             }
         }
     }
+    const settings: serialport::SerialPortSettings =  serialport::SerialPortSettings {
+        baud_rate: 9600,
+        Data_bits: serialport::DataBits::Eight,
+        flow_control: serialport::FlowControl::None,
+        parity: serialport::Parity::None,
+        stop_bits: serialport::StopBits::One,
+        timeout: Duration::from_millis(1),
+    };
+
 
     pub struct CommandString {
-        command     : Commands,
-        object      : Objects ,
-        device      : Devices ,
-        setwhat     : SetWhat,
-        value       : u32
+        pub command     : Commands,
+        pub object      : Objects ,
+        pub device      : Devices ,
+        pub setwhat     : SetWhat,
+        pub value       : u32
     }
 
     pub enum Errors {
@@ -129,10 +150,9 @@
         ErrParam
     }
 
-
     pub struct Arduino
     {
-        port: SystemPort,
+        port: serialport::SerialPort,
         options: OptionStruct,
         errors: Errors,
         is_setup: bool,
@@ -175,7 +195,6 @@
                             SetWhat::USINGTIME => if command_to_check.value > 1   { false} else { true },
                             _                  => return true,
 
-
                         },
                     },
                 }
@@ -195,17 +214,16 @@
 
         pub fn new(path_or_name: String) -> Result<Arduino, &'static str> {
             #[cfg(windows)]
-            let try_port = serial::open(&path_or_name);
+            let try_port = serialport::open_with_settings(&path_or_name);
             #[cfg(unix)]
-            let try_port = serial::open(Path::new(path_or_name));
+
+            let try_port = serialport::open_with_settings(Path::new(path_or_name));
             let mut port = match try_port {
                 Ok(good) => good,
                 Err(err) => return Err("Failed to open port"),
             };
-            match port.configure(&SERIAL_SETTINGS) {
-                Err(p) => return Err("Failed to configure port"),
-                Ok(t) => (),
-            };
+
+
 
             let options = OptionStruct {
                 h2o_sensor_pin: 10,
@@ -236,7 +254,11 @@
                 match self.port.read_exact(&mut buf) {
                     Ok(ch) => {
                         if buf[0] as char == 'A' {
-                            self.port.write(String::from("A").as_bytes());
+                            #[allow(unused_must_use)]
+                            match self.port.write(String::from("A").as_bytes()) {
+                                Ok(a)     => (),
+                                Err(_err) => return None,
+                            }
                             match self.port.read_exact(&mut buf) {
                                 Ok(n) => {
                                     if str::from_utf8(&buf).unwrap() == "B\r" {
@@ -258,7 +280,10 @@
             if self.connected == false || self.is_setup == false {
                 return None
             }
-            self.port.read(&mut buf);
+            match self.port.read(&mut buf) {
+                Ok(a)     => (),
+                Err(_err) => return None,
+            }
             if str::from_utf8(&buf).unwrap() == "SENDOPTS\r" {
                 let str_to_print = format!("{} {} {} {} {} {} {} {} {} {} {} {} {}\r",
                                          self.options.h2o_sensor_pin, self.options.water_pump_pin,
@@ -283,15 +308,71 @@
                 return None;
             }
 
-            let com_str = format!("SET {} {} {}\r", command.object.as_str(), command.device.as_str(), command.value );
+
+            match command.device {
+                Devices::WATERPUMP => {
+                    match command.setwhat {
+                        SetWhat::USINGTIME => {
+                            self.options.water_pump_using_time = cast_u32_to_bool(&command.value);
+                            ()
+                        },
+                        SetWhat::THRESHOLD => {
+                            self.options.h2o_sensor_threshold = command.value as u8;
+                            ()
+                        },
+                        SetWhat::TIMEON => {
+                            self.options.water_pump_time_on = command.value;
+                            ()
+                        },
+                        SetWhat::TIMEOFF => {
+                            self.options.water_pump_time_off = command.value;
+                            ()
+                        },
+                        SetWhat::NULL => return None,
+                    };
+                },
+                Devices::FOODPUMP => {
+                    match command.setwhat {
+                        SetWhat::USINGTIME => {
+                            self.options.food_pump_using_time =  cast_u32_to_bool(&command.value);
+                            ()
+                        },
+                        SetWhat::THRESHOLD => {
+                            self.options.ppm_sensor_threshold = command.value as u8;
+                            ()
+                        },
+                        SetWhat::TIMEON => {
+                            self.options.food_pump_time_on = command.value;
+                            ()
+                        },
+                        SetWhat::TIMEOFF => {
+                            self.options.food_pump_time_off = command.value;
+                            ()
+                        },
+                        SetWhat::NULL => return None,
+                    };
+                },
+                _ => return None,
+            };
+
+            let com_str = format!("SET {} {} {} {}\r", command.object.as_str(), command.device.as_str(),
+                                                              command.setwhat.as_str() ,command.value );
             match self.port.write_all(com_str.as_bytes()) {
                 Ok(a)    => Some(true),
                 Err(_err) => None,
             }
         }
 
-        fn get_data(&mut self, command: &CommandString) -> Option<String>
+        pub fn get_data(&mut self, command: &CommandString) -> Option<String>
         {
+
+            if Arduino::validate_command(&command) == false {
+                return None;
+            };
+            if self.is_setup == false {
+                return None
+            };
+
             let mut buf : [u8; 128] = [0;128];
             if self.connected == false {
                 return None
@@ -312,8 +393,6 @@
             };
             response
         }
-
-
 
     }
 
