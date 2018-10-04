@@ -15,6 +15,10 @@ class FoodPump : public Device {
     void turnOn();
     void turnOff();
     bool react();
-    bool setThreshold(uint32_t threshold);
+    bool setThreshold(uint32_t threshold, OPTS* EEPROM_opts);
+    void setUsingTime(bool usingTime,OPTS* EEPROM_opts);
+    void setOnTime(uint32_t onTime,  OPTS* EEPROM_opts);
+    void setOffTime(uint32_t offTime,OPTS* EEPROM_opts);
+   
 };
 #endif

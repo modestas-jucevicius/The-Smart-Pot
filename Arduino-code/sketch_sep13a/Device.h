@@ -2,7 +2,7 @@
 #define DEVICE_H
 
 #include <Arduino.h>
-
+#include "static_config.h"
 
 
 
@@ -23,12 +23,12 @@ class Device {
       bool    getState() { return this->currentState; }
       virtual void turnOn()=0;
       virtual void turnOff()=0;
-      virtual bool setThreshold(uint32_t threshold);
+      virtual bool setThreshold(uint32_t threshold, OPTS* EEPROM_opts);
       unsigned int getThreshold() { return threshold; }
-      void         setUsingTime(bool usingTime) { this->usingTime = usingTime; }
-      void         setOnTime(uint32_t onTime)   { this->onTime = onTime; }
-      void         setOffTime(uint32_t offTime) { this->offTime = offTime; }
-      void         changeUsingTime();
+      virtual void setUsingTime(bool usingTime,OPTS* EEPROM_opts);
+      virtual void setOnTime(uint32_t onTime,  OPTS* EEPROM_opts);
+      virtual void setOffTime(uint32_t offTime,OPTS* EEPROM_opts);
+      virtual void changeUsingTime();
 
   private:
       virtual bool react() =0;    

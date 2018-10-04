@@ -3,7 +3,7 @@
 
 #define BAUDRATE 9600
 #define MAXCOMMAND 255
-#define TERMINATOR '\r'
+#define TERMINATOR '\n'
 
 
 #define ERR_NOERROR   0 //for resetting connection with no error
@@ -38,5 +38,29 @@ enum SET_TYPE {
   THRESHOLD
 };
 
+struct OPTS {
+  byte H2OSensorPin;
+  byte H2OPumpPin;
+
+  byte H2OSensor_threshold;
+
+  bool H2OPump_usingTime;
+  uint32_t H2OPump_time_on; //
+  uint32_t H2OPump_time_off;
+
+  /**********************************/
+  byte PPMSensorPin;
+  byte FoodPumpPin;
+
+  byte PPMSensor_threshold;
+
+  bool     FoodPump_usingTime;
+  uint32_t FoodPump_time_on;
+  uint32_t FoodPump_time_off;
+
+
+
+  char current_setup[256];
+};
 
 #endif

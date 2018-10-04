@@ -7,30 +7,7 @@ void establishConnection();
 
 
 
-struct OPTS {
-  byte H2OSensorPin;
-  byte H2OPumpPin;
 
-  byte H2OSensor_threshold;
-
-  bool H2OPump_usingTime;
-  uint32_t H2OPump_time_on; //
-  uint32_t H2OPump_time_off;
-
-  /**********************************/
-  byte PPMSensorPin;
-  byte FoodPumpPin;
-
-  byte PPMSensor_threshold;
-
-  bool     FoodPump_usingTime;
-  uint32_t FoodPump_time_on;
-  uint32_t FoodPump_time_off;
-
-
-
-  char current_setup[256];
-};
 struct OPTS EEPROM_opts;
 
 
@@ -95,7 +72,18 @@ char commandString[MAXCOMMAND];
 
 
 
-
+void sendAllOptions()
+{
+	char* stringToPrint;
+	sprintf(stringToPrint, "%u %u %u %u %llu %llu %u %u %u %u %u %llu %llu %u %s\n",
+			EEPROM_opts.H2OSensorPin, EEPROM_opts.H2OPumpPin, EEPROM_opts.H2OSensor_threshold,
+			EEPROM_opts.H2OPump_usingTime, EEPROM_opts.H2OPump_time_on, EEPROM_opts.H2OPump_time_off,
+			EEPROM_opts.PPMSensorPin, EEPROM_opts.FoodPumpPin, EEPROM_opts.PPMSensor_threshold,
+			EEPROM_opts.FoodPump_usingTime, EEPROM_opts.FoodPump_time_on, EEPROM_opts.FoodPump_time_off,
+			EEPROM_opts.current_setup);
+	Serial.write(stringToPrint);
+	Serial.flush();
+}
 
 
 
@@ -105,7 +93,7 @@ void getOptions() //receive initialization options as one space-delim String
   bool gotResponse = false;
 
 
-  Serial.print("SENDOPTS\r");
+  Serial.print("SENDOPTS\n");
   while (!gotResponse) {
     switch (char c = Serial.read()) {
       case 'B': //positive response
@@ -171,6 +159,7 @@ void getOptions() //receive initialization options as one space-delim String
     goto processing_failed;
   strncpy(EEPROM_opts.current_setup, token, MAXCOMMAND - 1);
 
+  Serial.print("OK\n");
 
 
 
@@ -198,6 +187,7 @@ void setup() {
   Serial.print(hasBeenSetup);
   if (hasBeenSetup) {
     readDevState();
+	Serial.print(" \n");
   }
   else {
     while (!hasBeenSetup) {
@@ -260,7 +250,7 @@ void resetConnection(int errorno)
   
   Serial.print(" ERR ");
   Serial.print(errorno);
-  Serial.print('\r');
+  Serial.print('\n');
   Serial.flush();
   connected = false;
   serialFlush();
@@ -272,24 +262,24 @@ void processSensor(COM_TYPE com_type)
 {
   char* token;
 
-  token = strtok(NULL, "\r");
+  token = strtok(NULL, "\n");
 
   if (com_type == GET)
   {
     if (strcmp(token, "ALL") == 0)
     {
       Serial.print(devState->printAllSensors());
-      Serial.print('\r');
+      Serial.print('\n');
     }
     else if (strcmp(token, "H2OS") == 0)
     {
       Serial.print(devState->h2oSensor.asString());
-      Serial.print('\r');
+      Serial.print('\n');
     }
     else if (strcmp(token, "PPMS") == 0)
     {
       Serial.print(devState->ppmSensor.asString());
-      Serial.print('\r');
+      Serial.print('\n');
     }
     else
     {
@@ -305,7 +295,7 @@ void processSensor(COM_TYPE com_type)
 
 void processDevice(COM_TYPE com_type)
 {
-  char *token, *device; // token2 splits token by ":
+  char *token, *device; // token2 splits token by " "
   const char* errStr;
   Device* devToSet;
   uint32_t value;
@@ -351,25 +341,28 @@ void processDevice(COM_TYPE com_type)
   if (devSetting == USETIME)
   {
     value = atoi(token);
-    devToSet->setUsingTime((bool)value);
+    devToSet->setUsingTime((bool)value, &EEPROM_opts);
   }
   else if (devSetting == ONTIME)
   {
     value = atoi(token);
+    devToSet->setOnTime(value, &EEPROM_opts);
   }
   else if (devSetting == OFFTIME)
   {
     value = atoi(token);
-    devToSet->setOffTime(value);
+    devToSet->setOffTime(value, &EEPROM_opts);
   }
   else if (devSetting == THRESHOLD)
   {
     value = atoi(token);
-    if (devToSet->setThreshold(value) == false)
+    if (devToSet->setThreshold(value, &EEPROM_opts) == false)
       resetConnection(ERR_PARAM);
+	return;
   }
   
-
+  writeDevState();
+  
 }
 
 
@@ -411,6 +404,10 @@ void processCommands()
     {
       processDevice(com_type);
     }
+	else if (strcmp(token, "GETOPTS") == 0)
+	{
+		sendAllOptions();
+	}
     else
     {
       resetConnection(ERR_UKOBJ);
@@ -426,7 +423,7 @@ void establishConnection() {
       delay(300);
       if (Serial.read() == 'A') {
         Serial.print('B');
-        Serial.print('\r');
+        Serial.print('\n');
         connected = true;
       }
     }
