@@ -1,5 +1,6 @@
 from smartpot_control import SmartPot, WhatToGet, WhatToSet
 from flask import Flask
+import json
 app = Flask(__name__)
 
 smartpot = SmartPot()
@@ -10,16 +11,16 @@ def getH2OSenor():
 	if smartpot.connected == False:
 		try:
 			if smartpot.startConnection() == False:
-				return 'Failed to Connect'
+				return json.dumps({'error' : 'Failed to Connect'})
 			if smartpot.is_setup == False:
-				return 'Device has not yet been setup'
+				return json.dumps({'error' : 'Device has not yet been setup'})
 		except:
-			return 'Failed to open serial connection'
+			return json.dumps({'error' :'Failed to open serial connection'})
 	buf = smartpot.getData(WhatToGet.H2O_Sensor)
 	if buf:
-		return buf
+		return json.loads({'H2OS:' : buf})
 	else:
-		return "Failed to get Data"
+		return json.dumps({'error' :"Failed to get Data"})
 
 
 
