@@ -33,7 +33,8 @@ class SmartPot:
 	
 
 	def __init__(self):
-		self.connected = False
+		self.connected  = False
+		self.connection = None
 		self.settings  = {
 					'H2O_sensor_pin' 		: 10,
 					'H2O_pump_pin'   		: 12,
@@ -83,18 +84,20 @@ class SmartPot:
 	def startConnection(self, settings=None):
 
 		buf = str()
-		if connected:
+		if self.connected:
 			return True
 		else:
-			while not connected:
-				readch = connection.read()
+			if self.connection == None:
+				self.openConnection()
+			while not self.connected:
+				readch = self.connection.read()
 				if readch == 'A':
-					connection.reset_input_buffer()
-					connection.write('A')
-					connection.flush()
-					readch = connection.read()
+					self.connection.reset_input_buffer()
+					self.connection.write('A')
+					self.connection.flush()
+					readch = self.connection.read()
 					if readch == 'B':
-						connected = True
+						self.connected = True
 						if self.connection.readline() == "SENDOPTS":
 							if settings == None or self.checkSettings(settings) == False:
 								return False
@@ -102,7 +105,7 @@ class SmartPot:
 								return False
 							self.settings = settings
 						else:
-							self.settings = getSettings()
+							self.settings = self.getSettings()
 						if self.settings == None:
 							return False
 						return True
@@ -181,14 +184,17 @@ class SmartPot:
 	def getData(self,whatSensor: WhatToGet):
 		if not connected:
 			return None
+		buf = "GET SENSOR " + whatSensor.value + '\n'
+		self.connection.write(buf.encode())
+		self.connection.flush()
 		return self.connection.readline()
 	
-	def disconnect(delf):
+	def disconnect(self):
+		self.connected = False
 		if not connected:	
 			return True
 		self.connection.write("RESET\n".encode())
 		self.connection.flush()
-		self.connected = False
 		return True
 		
 		
