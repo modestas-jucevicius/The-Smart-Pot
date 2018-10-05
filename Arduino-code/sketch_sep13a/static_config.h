@@ -24,6 +24,7 @@
 #define PPM_SENSOR_PIN    11
 
 
+//#define DEBUG 1
 
 
 enum COM_TYPE {

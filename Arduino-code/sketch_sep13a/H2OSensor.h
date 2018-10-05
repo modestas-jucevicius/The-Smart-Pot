@@ -4,20 +4,22 @@
 #include "Sensor.h"
 
 class H2OSensor : public Sensor {
-   private:
-      unsigned char     inputPin;
+  private:
+    unsigned char     inputPin;
   public:
-      unsigned int      threshold = 0; //if val < threshold, add water until OK;
+    unsigned int      threshold = 0; //if val < threshold, add water until OK;
 
 
 
-      
-      
-   public:
-      H2OSensor( unsigned char inputPin, unsigned int threshold) : inputPin(inputPin), threshold(threshold) { pinMode(inputPin, INPUT); };
-      unsigned int readVal();
-      bool react();
-      String asString();
+
+
+  public:
+    H2OSensor( unsigned char inputPin, unsigned int threshold) : inputPin(inputPin), threshold(threshold) {
+      //pinMode(inputPin, INPUT);
+    };
+    unsigned int readVal();
+    bool react();
+    String asString();
 };
 
 #endif

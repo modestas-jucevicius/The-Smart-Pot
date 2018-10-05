@@ -1,5 +1,10 @@
 import serial
 from enum import Enum
+import logging
+import re
+
+logging.basicConfig(level=logging.DEBUG)
+
 
 
 
@@ -76,8 +81,8 @@ class SmartPot:
 					'setup_name'			: self.setup_name_str
 				}
 	
-	def openConnection(self, name="COM1", baudrate=9600, timeout=1):
-		self.connection = serial.Serial(name, baudrate, timeout=timeout)
+	def openConnection(self, name="COM5", baudrate=9600, timeout=1):
+		self.connection = serial.Serial(name, baudrate)# timeout=timeout)
 		
 	
 	
@@ -91,23 +96,30 @@ class SmartPot:
 				self.openConnection()
 			while not self.connected:
 				readch = self.connection.read()
-				if readch == 'A':
-					self.connection.reset_input_buffer()
-					self.connection.write('A')
-					self.connection.flush()
-					readch = self.connection.read()
-					if readch == 'B':
+				logging.debug(readch)
+				if readch == b'A':
+					logging.debug("Inside connection if")
+					#self.connection.reset_input_buffer()
+					self.connection.write('A'.encode())
+					#self.connection.flush()
+					response = self.connection.readline()
+					logging.debug(str(response))
+					if b'B' in response:
 						self.connected = True
+						logging.debug("Connected to serial")
 						if self.connection.readline() == "SENDOPTS":
+							logging.debug("Arduino needs options")
 							if settings == None or self.checkSettings(settings) == False:
 								return False
 							if self.sendAll(settings) == False:
 								return False
 							self.settings = settings
 						else:
+							logging.debug("Getting settings")
 							self.settings = self.getSettings()
 						if self.settings == None:
 							return False
+						self.is_setup = True
 						return True
 	
 			
@@ -122,41 +134,41 @@ class SmartPot:
 		else:
 			return 'H2OP USETIME 0'
 	def H2O_pump_time_on_str(self):
-		return 'H2OP ONTIME ' + str(this.settings['H2O_pump_time_on'])
+		return 'H2OP ONTIME ' + str(self.settings['H2O_pump_time_on'])
 	def H2O_pump_time_off_str(self):
-		return 'H2OP OFFTIME ' + str(this.settings['H2O_pump_time_off'])
+		return 'H2OP OFFTIME ' + str(self.settings['H2O_pump_time_off'])
 	def H2O_sensor_threshold_str(self):
-		return 'H2OP THRESHOLD ' + str(this.settings['H2O_sensor_threshold'])					
+		return 'H2OP THRESHOLD ' + str(self.settings['H2O_sensor_threshold'])					
 	def food_pump_using_time_str(self):
 		if self.settings['food_pump_using_time'] == True:
 			return 'FOODP USETIME 1'
 		else:
 			return 'FOODP USETIME 0'
 	def food_pump_time_on_str(self):
-		return 'FOODP ONTIME ' + str(this.settings['food_pump_time_on'])
+		return 'FOODP ONTIME ' + str(self.settings['food_pump_time_on'])
 	def food_pump_time_off_str(self):
-		return 'FOODP OFFTIME ' + str(this.settings['food_pump_time_off'])
+		return 'FOODP OFFTIME ' + str(self.settings['food_pump_time_off'])
 	def PPM_sensor_threshold_str(self):
-		return 'FOODP THRESHOLD ' + str(this.settings['PPM_sensor_threshold'])
+		return 'FOODP THRESHOLD ' + str(self.settings['PPM_sensor_threshold'])
 	def setup_name_str(self):
-		return 'SETUPNAME ' + this.settings['setup_name']
+		return 'SETUPNAME ' + self.settings['setup_name']
 	
 	def sendAll(self):
 		if not connected or not is_setup:
 			return False
 		self.connection.serial.write('B')
-		writebuf = 	   str(this.settings['H2O_sensor_pin']) + ' ' +          \
-					   str(this.settings['H2O_pump_pin']) + ' ' +			 \
-					   str(this.settings['H2O_sensor_threshold']) + ' ' +    \
-					   str(this.settings['H2O_pump_using_time']) + ' ' +     \
-					   str(this.settings['H2O_pump_time_on']) + ' ' +        \
-					   str(this.settings['H2O_pump_time_off']) + ' ' +       \
-					   str(this.settings['PPM_sensor_pin']) + ' ' +          \
-					   str(this.settings['food_pump_pin']) + ' ' +           \
-					   str(this.settings['PPM_sensor_threshold']) + ' ' +    \
-					   str(this.settings['food_pump_using_time']) + ' ' +    \
-					   str(this.settings['food_pump_time_on']) + ' ' +       \
-					   str(this.settings['food_pump_time_off']) + ' ' +      \
+		writebuf = 	   str(self.settings['H2O_sensor_pin']) + ' ' +          \
+					   str(self.settings['H2O_pump_pin']) + ' ' +			 \
+					   str(self.settings['H2O_sensor_threshold']) + ' ' +    \
+					   str(self.settings['H2O_pump_using_time']) + ' ' +     \
+					   str(self.settings['H2O_pump_time_on']) + ' ' +        \
+					   str(self.settings['H2O_pump_time_off']) + ' ' +       \
+					   str(self.settings['PPM_sensor_pin']) + ' ' +          \
+					   str(self.settings['food_pump_pin']) + ' ' +           \
+					   str(self.settings['PPM_sensor_threshold']) + ' ' +    \
+					   str(self.settings['food_pump_using_time']) + ' ' +    \
+					   str(self.settings['food_pump_time_on']) + ' ' +       \
+					   str(self.settings['food_pump_time_off']) + ' ' +      \
 					   self.settings['setup_name'] + '\n'
 		self.connection.write(writebuf.encode())
 		self.connection.flush()
@@ -176,34 +188,40 @@ class SmartPot:
 		newSetting[whatSetting.value] = value
 		if checkSettings(newSetting) == False:
 				return False
-		this.settings = newSetting
+		self.settings = newSetting
 		writebuf = "SET DEVICE " + stringFunc[whatSetting.value]() + '\n'
 		self.connection.write(writebuf.encode())
 		self.connection.flush()
 		
 	def getData(self,whatSensor: WhatToGet):
-		if not connected:
+		if not self.connected:
 			return None
 		buf = "GET SENSOR " + whatSensor.value + '\n'
 		self.connection.write(buf.encode())
 		self.connection.flush()
-		return self.connection.readline()
+		return self.connection.readline().decode()
 	
 	def disconnect(self):
-		self.connected = False
-		if not connected:	
+		try:
+			self.connection.write("RESET\n".encode())
+			self.connection.flush()
+		except:
+			pass
+		self.connection  = None
+		if not self.connected:	
 			return True
-		self.connection.write("RESET\n".encode())
-		self.connection.flush()
+		self.connected = False
 		return True
 		
 		
 	
 	
 	def getSettings(self):
-		this.connection.write("GETOPTS\n".encode())
-		buffer = this.connection.readline()
-		buffer = buffer.split(' ')
+		self.connection.write("GETOPTS\n".encode())
+		buffer = self.connection.readline()
+		logging.debug("gotString %s", buffer.decode())
+		buffer = buffer.decode().split(' ')
+		logging.debug("split into %s", buffer)
 		if len(buffer) < 13:
 			return None
 		settings  = {
@@ -224,7 +242,7 @@ class SmartPot:
 					'food_pump_time_on'		: int(buffer[10]),
 					'food_pump_time_off'	: int(buffer[11]),
 					
-					'setup_name'			: buffer[12],
+					'setup_name'			: buffer[12].rstrip('\n\r'),
 				}
 		self.settings = settings
 		return settings

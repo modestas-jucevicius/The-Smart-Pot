@@ -2,6 +2,9 @@
 
 
 bool H2OSensor::react() {
+  #ifdef DEBUG
+  Serial.print("in H2OSensor::react() ");
+  #endif
   return readVal() < threshold;
 }
 
@@ -13,7 +16,7 @@ unsigned int H2OSensor::readVal()
 String H2OSensor::asString()
 {
 
-  String retString = "H2OS:";
+  String retString = "H2OS ";
   retString += readVal();
   return retString;
 
