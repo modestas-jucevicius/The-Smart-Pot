@@ -178,10 +178,27 @@ processing_failed:
 
 
 
-
+void blink3()
+{
+  digitalWrite(13, HIGH);
+  delay(100);
+  digitalWrite(13, LOW);
+  delay(100);
+  digitalWrite(13, HIGH);
+  delay(100);
+  digitalWrite(13, LOW);
+  delay(100);
+  digitalWrite(13, HIGH);
+  delay(100);
+  digitalWrite(13, LOW);
+  delay(100);
+  
+}
 
 void setup() {
   Serial.begin(BAUDRATE);
+  pinMode(13, OUTPUT);
+  blink3();
 
   hasBeenSetup = EEPROM.read(0);
   Serial.print(hasBeenSetup);

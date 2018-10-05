@@ -14,7 +14,7 @@ class H2OSensor : public Sensor {
       
       
    public:
-      H2OSensor( unsigned char inputPin, unsigned int threshold) : inputPin(inputPin), threshold(threshold) {};
+      H2OSensor( unsigned char inputPin, unsigned int threshold) : inputPin(inputPin), threshold(threshold) { pinMode(inputPin, INPUT); };
       unsigned int readVal();
       bool react();
       String asString();
